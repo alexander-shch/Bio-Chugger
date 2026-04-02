@@ -17,7 +17,7 @@ THEMES = {
         "fg_medium": "#B3B3B3",# Medium Emphasis
         "accent": "#03DAC6",   # Material Teal
         "secondary": "#CF6679",# Material Error/Pink
-        "btn_bg": "#2C2C2C",
+        "btn_bg": "#000000",
         "btn_fg": "#FFFFFF",
         "tree_bg": "#1E1E1E",
         "tree_head": "#2C2C2C"
@@ -50,7 +50,7 @@ class BioChuggerApp:
         self.points = [50] * 60
         self.config = self.load_config()
         self.watch_id = self.config.get("watch_id", "")
-        self.current_theme_name = self.config.get("theme", "dark")
+        self.current_theme_name = self.config.get("theme", "light")
         self.colors = THEMES[self.current_theme_name]
         
         self.osc_client = udp_client.SimpleUDPClient("127.0.0.1", 8000)
