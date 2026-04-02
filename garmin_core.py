@@ -11,11 +11,14 @@ class GarminCore:
         self.client = None
         self.is_connected = False
         self.should_run = True
+        self.loop = None
 
     async def start(self):
         if not self.watch_id:
             self.status_callback("NO DEVICE SET", "red")
             return
+        
+        self.loop = asyncio.get_running_loop()
 
         while self.should_run: # Auto-reconnect loop
             try:
@@ -26,7 +29,8 @@ class GarminCore:
                     
                     def handle_data(sender, data):
                         # data[1] is the heart rate byte in the standard HR profile
-                        self.callback(data[1])
+                        if self.callback:
+                            self.callback(data[1])
                     
                     await self.client.start_notify(HR_UUID, handle_data)
                     while self.client.is_connected and self.should_run:
@@ -40,5 +44,8 @@ class GarminCore:
 
     def stop(self):
         self.should_run = False
-        if self.client:
-            asyncio.create_task(self.client.disconnect())
+        if self.client and self.loop:
+            # Safely schedule the disconnect in the running loop
+            self.loop.call_soon_threadsafe(
+                lambda: asyncio.create_task(self.client.disconnect())
+            )

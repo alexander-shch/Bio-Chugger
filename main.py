@@ -17,7 +17,7 @@ THEMES = {
         "fg_medium": "#B3B3B3",# Medium Emphasis
         "accent": "#03DAC6",   # Material Teal
         "secondary": "#CF6679",# Material Error/Pink
-        "btn_bg": "#000000",
+        "btn_bg": "#333333",   # Explicit Dark Grey for buttons
         "btn_fg": "#FFFFFF",
         "tree_bg": "#1E1E1E",
         "tree_head": "#2C2C2C"
@@ -50,7 +50,7 @@ class BioChuggerApp:
         self.points = [50] * 60
         self.config = self.load_config()
         self.watch_id = self.config.get("watch_id", "")
-        self.current_theme_name = self.config.get("theme", "light")
+        self.current_theme_name = self.config.get("theme", "dark")
         self.colors = THEMES[self.current_theme_name]
         
         self.osc_client = udp_client.SimpleUDPClient("127.0.0.1", 8000)
@@ -74,16 +74,14 @@ class BioChuggerApp:
         self.ctrl_frame = tk.Frame(root)
         self.ctrl_frame.pack(pady=10)
 
-        # Helper for common button style
-        self.btn_font = ("Inter", 10, "bold")
-
-        self.mute_btn = tk.Button(self.ctrl_frame, text="MUTE CLICK", command=self.toggle_mute, width=14)
+        # Using ttk.Button for more consistent macOS styling
+        self.mute_btn = ttk.Button(self.ctrl_frame, text="MUTE CLICK", command=self.toggle_mute, width=14)
         self.mute_btn.pack(side="left", padx=8)
 
-        self.server_btn = tk.Button(self.ctrl_frame, text="START BROADCAST", command=self.toggle_server, width=18)
+        self.server_btn = ttk.Button(self.ctrl_frame, text="START BROADCAST", command=self.toggle_server, width=18)
         self.server_btn.pack(side="left", padx=8)
 
-        self.theme_btn = tk.Button(self.ctrl_frame, text="DARK MODE", command=self.toggle_theme, width=14)
+        self.theme_btn = ttk.Button(self.ctrl_frame, text="DARK MODE", command=self.toggle_theme, width=14)
         self.theme_btn.pack(side="left", padx=8)
 
         # DEVICE SECTION
@@ -96,7 +94,7 @@ class BioChuggerApp:
         self.device_label = tk.Label(self.device_header, text="DEVICE LINK", font=("Inter", 11, "bold"))
         self.device_label.pack(side="left")
 
-        self.scan_btn = tk.Button(self.device_frame, text="SCAN FOR DEVICES", command=self.start_scan)
+        self.scan_btn = ttk.Button(self.device_frame, text="SCAN FOR DEVICES", command=self.start_scan)
         self.scan_btn.pack(fill="x", pady=10)
 
         self.device_list = ttk.Treeview(self.device_frame, columns=("ID", "Name"), show="headings", height=5)
@@ -168,6 +166,21 @@ class BioChuggerApp:
                              borderwidth=0,
                              font=("Inter", 10, "bold"))
 
+        # Configure ttk.Button colors via style for better contrast and macOS compatibility
+        self.style.configure("TButton", 
+                             background=c["btn_bg"], 
+                             foreground=c["btn_fg"], 
+                             font=("Inter", 10, "bold"))
+        self.style.map("TButton", 
+                       background=[('active', c["accent"]), ('pressed', c["accent"])],
+                       foreground=[('active', "#000000"), ('pressed', "#000000")])
+
+        # Specific style for highlighted buttons
+        self.style.configure("Accent.TButton", 
+                             background=c["accent"], 
+                             foreground="#000000", 
+                             font=("Inter", 10, "bold"))
+
         # Main Components
         self.card_frame.config(bg=c["surface"])
         self.bpm_text.config(bg=c["surface"], fg=c["accent"] if self.current_bpm > 0 else c["fg_medium"])
@@ -175,26 +188,12 @@ class BioChuggerApp:
         
         self.ctrl_frame.config(bg=c["bg"])
         
-        # High contrast button base
-        btn_base = {
-            "bg": c["btn_bg"],
-            "fg": c["btn_fg"],
-            "font": self.btn_font,
-            "relief": "flat",
-            "activebackground": c["accent"],
-            "activeforeground": "#000000",
-            "highlightthickness": 0,
-            "bd": 0,
-            "pady": 8
-        }
-        
-        for btn in [self.mute_btn, self.server_btn, self.theme_btn, self.scan_btn]:
-            btn.config(**btn_base)
-
-        # Specific states
+        # Update server button style if broadcasting
         if self.broadcasting:
-            self.server_btn.config(bg=c["accent"], fg="#000000")
-        
+            self.server_btn.config(style="Accent.TButton")
+        else:
+            self.server_btn.config(style="TButton")
+
         self.device_frame.config(bg=c["bg"])
         self.device_header.config(bg=c["bg"])
         self.device_label.config(bg=c["bg"], fg=c["fg"])
@@ -225,7 +224,7 @@ class BioChuggerApp:
         Thread(target=run_core, daemon=True).start()
 
     def start_scan(self):
-        self.scan_btn.config(state="disabled", text="SCANNING...", bg=self.colors["tree_head"])
+        self.scan_btn.config(state="disabled", text="SCANNING...")
         self.device_list.delete(*self.device_list.get_children())
         
         async def scan():
@@ -233,7 +232,7 @@ class BioChuggerApp:
             for d in devices:
                 name = d.name if d.name else "Unknown Device"
                 self.device_list.insert("", "end", values=(d.address, name))
-            self.scan_btn.config(state="normal", text="SCAN FOR DEVICES", bg=self.colors["btn_bg"])
+            self.scan_btn.config(state="normal", text="SCAN FOR DEVICES")
 
         def run_scan():
             asyncio.run(scan())
@@ -250,10 +249,10 @@ class BioChuggerApp:
     def toggle_server(self):
         self.broadcasting = not self.broadcasting
         if self.broadcasting:
-            self.server_btn.config(text="STOP BROADCAST", bg=self.colors["accent"], fg="#000000")
+            self.server_btn.config(style="Accent.TButton", text="STOP BROADCAST")
             self.update_status("● BROADCASTING TO REAPER", self.colors["accent"])
         else:
-            self.server_btn.config(text="START BROADCAST", bg=self.colors["btn_bg"], fg=self.colors["btn_fg"])
+            self.server_btn.config(style="TButton", text="START BROADCAST")
             self.update_status("● STANDBY (LINKED)", self.colors["accent"])
 
     def toggle_mute(self):
