@@ -8,27 +8,31 @@ from garmin_core import GarminCore
 
 CONFIG_FILE = "config.json"
 
-# --- THEMES ---
+# --- MATERIAL DESIGN THEMES ---
 THEMES = {
     "dark": {
-        "bg": "#0A0A0A",
-        "fg": "#FFFFFF",
-        "accent": "#00FF41", # Matrix Green
-        "secondary": "#FF9900", # Amber
-        "dim": "#888888",
-        "btn_bg": "#151515",
-        "tree_bg": "#111",
-        "tree_head": "#222"
+        "bg": "#121212",        # Material Surface
+        "surface": "#1E1E1E",  # Material Secondary Surface
+        "fg": "#FFFFFF",       # High Emphasis
+        "fg_medium": "#B3B3B3",# Medium Emphasis
+        "accent": "#03DAC6",   # Material Teal
+        "secondary": "#CF6679",# Material Error/Pink
+        "btn_bg": "#2C2C2C",
+        "btn_fg": "#FFFFFF",
+        "tree_bg": "#1E1E1E",
+        "tree_head": "#2C2C2C"
     },
     "light": {
-        "bg": "#F0F0F0",
-        "fg": "#111111",
-        "accent": "#0055BB", # Deep Blue
-        "secondary": "#CC3300", # Red-ish
-        "dim": "#555555",
+        "bg": "#FFFFFF",
+        "surface": "#F5F5F5",
+        "fg": "#000000",
+        "fg_medium": "#666666",
+        "accent": "#6200EE",   # Material Purple
+        "secondary": "#B00020",# Material Red
         "btn_bg": "#E0E0E0",
+        "btn_fg": "#000000",
         "tree_bg": "#FFFFFF",
-        "tree_head": "#D0D0D0"
+        "tree_head": "#E0E0E0"
     }
 }
 
@@ -36,14 +40,14 @@ class BioChuggerApp:
     def __init__(self, root):
         self.root = root
         self.root.title("BIO-CHUGGER PRO")
-        self.root.geometry("600x800")
+        self.root.geometry("620x850")
 
         # LOGIC STATE
         self.current_bpm = 120
         self.time_signature = 4
         self.is_muted = False
         self.broadcasting = False
-        self.points = [100] * 60
+        self.points = [50] * 60
         self.config = self.load_config()
         self.watch_id = self.config.get("watch_id", "")
         self.current_theme_name = self.config.get("theme", "dark")
@@ -56,56 +60,62 @@ class BioChuggerApp:
         self.style = ttk.Style()
         self.style.theme_use('clam')
         
-        # UI: BPM DISPLAY
-        self.bpm_frame = tk.Frame(root)
-        self.bpm_frame.pack(pady=30)
+        # UI: CARD-LIKE BPM DISPLAY
+        self.card_frame = tk.Frame(root, pady=40, padx=20)
+        self.card_frame.pack(fill="x", padx=20, pady=20)
         
-        self.bpm_text = tk.Label(self.bpm_frame, text="---", font=("Helvetica", 100, "bold"))
+        self.bpm_text = tk.Label(self.card_frame, text="---", font=("Inter", 120, "bold"))
         self.bpm_text.pack()
         
-        self.bpm_label = tk.Label(self.bpm_frame, text="BPM", font=("Courier", 14, "bold"))
+        self.bpm_label = tk.Label(self.card_frame, text="BEATS PER MINUTE", font=("Inter", 12, "bold"))
         self.bpm_label.pack()
 
         # CONTROL PANEL
         self.ctrl_frame = tk.Frame(root)
         self.ctrl_frame.pack(pady=10)
 
-        self.mute_btn = tk.Button(self.ctrl_frame, text="MUTE CLICK", command=self.toggle_mute, width=12)
-        self.mute_btn.pack(side="left", padx=10)
+        # Helper for common button style
+        self.btn_font = ("Inter", 10, "bold")
 
-        self.server_btn = tk.Button(self.ctrl_frame, text="START BROADCAST", command=self.toggle_server, width=15)
-        self.server_btn.pack(side="left", padx=10)
+        self.mute_btn = tk.Button(self.ctrl_frame, text="MUTE CLICK", command=self.toggle_mute, width=14)
+        self.mute_btn.pack(side="left", padx=8)
 
-        self.theme_btn = tk.Button(self.ctrl_frame, text="THEME", command=self.toggle_theme, width=12)
-        self.theme_btn.pack(side="left", padx=10)
+        self.server_btn = tk.Button(self.ctrl_frame, text="START BROADCAST", command=self.toggle_server, width=18)
+        self.server_btn.pack(side="left", padx=8)
+
+        self.theme_btn = tk.Button(self.ctrl_frame, text="DARK MODE", command=self.toggle_theme, width=14)
+        self.theme_btn.pack(side="left", padx=8)
 
         # DEVICE SECTION
-        self.device_frame = tk.Frame(root, padx=20)
+        self.device_frame = tk.Frame(root, padx=30)
         self.device_frame.pack(fill="x", pady=20)
         
-        self.device_label = tk.Label(self.device_frame, text="DEVICE LINK", font=("Courier", 12, "bold"))
-        self.device_label.pack(anchor="w")
+        self.device_header = tk.Frame(self.device_frame)
+        self.device_header.pack(fill="x")
+        
+        self.device_label = tk.Label(self.device_header, text="DEVICE LINK", font=("Inter", 11, "bold"))
+        self.device_label.pack(side="left")
 
-        self.scan_btn = tk.Button(self.device_frame, text="SCAN FOR DEVICES", command=self.start_scan, width=20)
-        self.scan_btn.pack(pady=10)
+        self.scan_btn = tk.Button(self.device_frame, text="SCAN FOR DEVICES", command=self.start_scan)
+        self.scan_btn.pack(fill="x", pady=10)
 
         self.device_list = ttk.Treeview(self.device_frame, columns=("ID", "Name"), show="headings", height=5)
-        self.device_list.heading("ID", text="ADDRESS / ID")
+        self.device_list.heading("ID", text="DEVICE ID")
         self.device_list.heading("Name", text="SIGNAL NAME")
         self.device_list.column("ID", width=250)
         self.device_list.column("Name", width=250)
         self.device_list.pack(fill="x", pady=5)
         self.device_list.bind("<Double-1>", self.on_device_select)
 
-        # OSCILLOSCOPE / WAVEFORM
-        self.canvas_frame = tk.Frame(root, highlightthickness=1)
-        self.canvas_frame.pack(pady=10, padx=20, fill="x")
-        self.canvas = tk.Canvas(self.canvas_frame, height=100, highlightthickness=0)
-        self.canvas.pack(fill="x", padx=2, pady=2)
+        # WAVEFORM (CARD STYLE)
+        self.canvas_card = tk.Frame(root, highlightthickness=0)
+        self.canvas_card.pack(pady=10, padx=30, fill="x")
+        self.canvas = tk.Canvas(self.canvas_card, height=120, highlightthickness=0)
+        self.canvas.pack(fill="x")
 
         # STATUS BAR
-        self.status_text = tk.Label(root, text="INITIALIZING...", font=("Courier", 10))
-        self.status_text.pack(side="bottom", fill="x", pady=10)
+        self.status_text = tk.Label(root, text="READY", font=("Inter", 9))
+        self.status_text.pack(side="bottom", fill="x", pady=15)
 
         # APPLY THEME
         self.apply_theme()
@@ -114,7 +124,7 @@ class BioChuggerApp:
         if self.watch_id:
             self.init_watch_connection()
         else:
-            self.update_status("NO DEVICE LINKED", self.colors["secondary"])
+            self.update_status("PLEASE LINK A DEVICE", self.colors["secondary"])
         
         # 2. START ENGINE
         Thread(target=self.metronome_engine, daemon=True).start()
@@ -145,52 +155,55 @@ class BioChuggerApp:
                              background=c["tree_bg"], 
                              foreground=c["fg"], 
                              fieldbackground=c["tree_bg"], 
-                             rowheight=30,
+                             rowheight=35,
                              borderwidth=0,
-                             font=("Courier", 11))
+                             font=("Inter", 10))
         self.style.map("Treeview", 
                        background=[('selected', c["accent"])],
-                       foreground=[('selected', "#000" if self.current_theme_name == "dark" else "#FFF")])
+                       foreground=[('selected', "#000000")])
         
         self.style.configure("Treeview.Heading", 
                              background=c["tree_head"], 
-                             foreground=c["accent"], 
+                             foreground=c["fg_medium"], 
                              borderwidth=0,
-                             font=("Courier", 12, "bold"))
+                             font=("Inter", 10, "bold"))
 
-        # Widgets
-        self.bpm_frame.config(bg=c["bg"])
-        self.bpm_text.config(bg=c["bg"], fg=c["accent"] if self.current_bpm > 0 else c["dim"])
-        self.bpm_label.config(bg=c["bg"], fg=c["accent"])
+        # Main Components
+        self.card_frame.config(bg=c["surface"])
+        self.bpm_text.config(bg=c["surface"], fg=c["accent"] if self.current_bpm > 0 else c["fg_medium"])
+        self.bpm_label.config(bg=c["surface"], fg=c["fg_medium"])
         
         self.ctrl_frame.config(bg=c["bg"])
-        btn_style = {
+        
+        # High contrast button base
+        btn_base = {
             "bg": c["btn_bg"],
-            "fg": c["fg"],
-            "font": ("Courier", 10, "bold"),
+            "fg": c["btn_fg"],
+            "font": self.btn_font,
             "relief": "flat",
-            "borderwidth": 1,
-            "highlightbackground": c["dim"],
             "activebackground": c["accent"],
-            "activeforeground": "#000",
-            "padx": 10,
-            "pady": 5
+            "activeforeground": "#000000",
+            "highlightthickness": 0,
+            "bd": 0,
+            "pady": 8
         }
         
         for btn in [self.mute_btn, self.server_btn, self.theme_btn, self.scan_btn]:
-            btn.config(**btn_style)
+            btn.config(**btn_base)
 
+        # Specific states
         if self.broadcasting:
-            self.server_btn.config(bg=c["accent"], fg="#000")
-
+            self.server_btn.config(bg=c["accent"], fg="#000000")
+        
         self.device_frame.config(bg=c["bg"])
-        self.device_label.config(bg=c["bg"], fg=c["dim"])
+        self.device_header.config(bg=c["bg"])
+        self.device_label.config(bg=c["bg"], fg=c["fg"])
         
-        self.canvas_frame.config(bg=c["tree_bg"], highlightbackground=c["dim"])
-        self.canvas.config(bg="#000" if self.current_theme_name == "dark" else "#FFF")
+        self.canvas_card.config(bg=c["surface"])
+        self.canvas.config(bg=c["surface"])
         
-        self.status_text.config(bg=c["bg"], fg=c["dim"])
-        self.theme_btn.config(text=f"THEME: {self.current_theme_name.upper()}")
+        self.status_text.config(bg=c["bg"], fg=c["fg_medium"])
+        self.theme_btn.config(text="LIGHT THEME" if self.current_theme_name == "dark" else "DARK THEME")
 
     def toggle_theme(self):
         self.current_theme_name = "light" if self.current_theme_name == "dark" else "dark"
@@ -212,15 +225,15 @@ class BioChuggerApp:
         Thread(target=run_core, daemon=True).start()
 
     def start_scan(self):
-        self.scan_btn.config(state="disabled", text="SCANNING...", fg=self.colors["secondary"])
+        self.scan_btn.config(state="disabled", text="SCANNING...", bg=self.colors["tree_head"])
         self.device_list.delete(*self.device_list.get_children())
         
         async def scan():
             devices = await BleakScanner.discover(timeout=5.0)
             for d in devices:
-                name = d.name if d.name else "Unknown Signal"
+                name = d.name if d.name else "Unknown Device"
                 self.device_list.insert("", "end", values=(d.address, name))
-            self.scan_btn.config(state="normal", text="SCAN FOR DEVICES", fg=self.colors["fg"])
+            self.scan_btn.config(state="normal", text="SCAN FOR DEVICES", bg=self.colors["btn_bg"])
 
         def run_scan():
             asyncio.run(scan())
@@ -231,16 +244,16 @@ class BioChuggerApp:
         item = self.device_list.selection()[0]
         self.watch_id = self.device_list.item(item, "values")[0]
         self.save_config()
-        self.update_status(f"LINKED TO {self.watch_id}", self.colors["accent"])
+        self.update_status(f"LINKED: {self.watch_id}", self.colors["accent"])
         self.init_watch_connection()
 
     def toggle_server(self):
         self.broadcasting = not self.broadcasting
         if self.broadcasting:
-            self.server_btn.config(text="STOP BROADCAST", bg=self.colors["accent"], fg="#000")
+            self.server_btn.config(text="STOP BROADCAST", bg=self.colors["accent"], fg="#000000")
             self.update_status("● BROADCASTING TO REAPER", self.colors["accent"])
         else:
-            self.server_btn.config(text="START BROADCAST", bg=self.colors["btn_bg"], fg=self.colors["fg"])
+            self.server_btn.config(text="START BROADCAST", bg=self.colors["btn_bg"], fg=self.colors["btn_fg"])
             self.update_status("● STANDBY (LINKED)", self.colors["accent"])
 
     def toggle_mute(self):
@@ -254,13 +267,12 @@ class BioChuggerApp:
             self.osc_client.send_message("/tempo", float(bpm))
 
     def update_status_wrapper(self, message, color):
-        # Translate named colors if necessary, or just use accent if it's a success
         if color == "#00ff00": color = self.colors["accent"]
         if color == "red": color = self.colors["secondary"]
         self.update_status(message, color)
 
     def update_status(self, message, color):
-        self.status_text.config(text=message, fg=color)
+        self.status_text.config(text=message.upper(), fg=color)
 
     def metronome_engine(self):
         beat = 1
@@ -278,20 +290,21 @@ class BioChuggerApp:
                 else:
                     print("\a", end="", flush=True)
             
-            self.points[-2], self.points[-1] = (10, 90) if beat == 1 else (40, 60)
+            self.points[-2], self.points[-1] = (20, 100) if beat == 1 else (50, 70)
             beat = (beat % self.time_signature) + 1
             time.sleep(delay)
 
     def animate_wave(self):
         self.canvas.delete("wave")
-        self.points.append(50) # Middle line
+        self.points.append(60) 
         if len(self.points) > 60: self.points.pop(0)
         
         w = self.canvas.winfo_width()
         step = w / 60 if w > 60 else 10
 
         for i in range(len(self.points)-1):
-            self.canvas.create_line(i*step, self.points[i], (i+1)*step, self.points[i+1], fill=self.colors["accent"], width=2, tags="wave")
+            self.canvas.create_line(i*step, self.points[i], (i+1)*step, self.points[i+1], 
+                                   fill=self.colors["accent"], width=3, tags="wave", capstyle="round")
         self.root.after(40, self.animate_wave)
 
 if __name__ == "__main__":
