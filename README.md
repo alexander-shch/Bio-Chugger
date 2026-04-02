@@ -15,6 +15,23 @@ Download the latest pre-built executables for **macOS** and **Windows** from the
 - **Device Scanning:** Easily scan and save your watch's Bluetooth ID.
 - **Auto-Reconnect:** Automatically tries to reconnect if the link is dropped.
 
+## 🛡️ Security & Permissions
+
+Because these executables are not signed with a paid developer certificate, your operating system may block them by default.
+
+### macOS
+1. When you first open the app, you might see a warning that the developer cannot be verified.
+2. Go to **System Settings > Privacy & Security**.
+3. Scroll down to the **Security** section and click **"Open Anyway"** next to the Bio-Chugger app.
+4. **Bluetooth**: The app will request Bluetooth access. You must click **Allow** for the scanner to function.
+
+### Windows
+1. When running the `.exe`, Windows SmartScreen may show a blue window saying "Windows protected your PC".
+2. Click **"More info"**.
+3. Click **"Run anyway"**.
+
+---
+
 ## Usage
 
 1. **Scan for Devices:** Click the "SCAN FOR DEVICES" button.
