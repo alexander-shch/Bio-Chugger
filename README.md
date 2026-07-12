@@ -25,6 +25,35 @@ Because these executables are not signed with a paid developer certificate, your
 3. Scroll down to the **Security** section and click **"Open Anyway"** next to the Bio-Chugger app.
 4. **Bluetooth**: The app will request Bluetooth access. You must click **Allow** for the scanner to function.
 
+### ⚠️ macOS Bluetooth Limitation (Important)
+
+**The pre-built `.app` from Releases uses an ad-hoc signature. macOS requires a hardened runtime with a valid Apple Developer ID certificate ($99/year) for Bluetooth LE to work in a packaged app.**
+
+| Method | Bluetooth Works |
+|--------|-----------------|
+| Run from source: `python main.py` | ✅ Yes |
+| Built `.app` (ad-hoc signed) | ❌ No |
+| Built `.app` (Dev ID + notarized) | ✅ Yes |
+
+If you download the Release `.app` and it finds your watch but **fails to connect**, this is expected. You have two options:
+
+1. **Run from source** (recommended for personal use):
+   ```bash
+   git clone git@github.com:alexander-shch/Bio-Chugger.git
+   cd Bio-Chugger
+   python3 -m venv .venv
+   source .venv/bin/activate
+   pip install bleak python-osc
+   python3 main.py
+   ```
+
+2. **Build and sign locally** with your own Developer ID:
+   ```bash
+   # Requires: Apple Developer ID certificate in Keychain
+   pyinstaller Bio-Chugger-Mac.spec
+   codesign --force --deep --options=runtime --entitlements entitlements.plist --sign "Developer ID Application: Your Name (TEAMID)" dist/Bio-Chugger-Mac.app
+   ```
+
 ### Windows
 1. When running the `.exe`, Windows SmartScreen may show a blue window saying "Windows protected your PC".
 2. Click **"More info"**.
@@ -102,7 +131,7 @@ To build locally with PyInstaller:
 pyinstaller --noconfirm --onefile --windowed --name "Bio-Chugger-Win" main.py
 
 # macOS
-pyinstaller --noconfirm --windowed --name "Bio-Chugger-Mac" main.py
+pyinstaller --noconfirm Bio-Chugger-Mac.spec
 ```
 
 ## Troubleshooting
