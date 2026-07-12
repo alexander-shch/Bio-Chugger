@@ -55,6 +55,18 @@ class BioChuggerApp:
         
         self.osc_client = udp_client.SimpleUDPClient("127.0.0.1", 8000)
         self.core = None
+        
+        # PERSISTENT BLE ASYNC LOOP ON MAIN THREAD
+        self.scanned_devices = {}
+        self.current_task = None
+        self.ble_loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(self.ble_loop)
+        
+        # Start polling the asyncio loop within Tkinter
+        self.root.after(10, self.poll_asyncio_loop)
+        
+        # Register window close protocol
+        self.root.protocol("WM_DELETE_WINDOW", self.on_close)
 
         # --- STYLING ---
         self.style = ttk.Style()
@@ -210,41 +222,75 @@ class BioChuggerApp:
         self.apply_theme()
         self.save_config()
 
-    def init_watch_connection(self):
-        if self.core:
-            self.core.stop()
-        
-        def run_core():
+    def poll_asyncio_loop(self):
+        try:
+            self.ble_loop.call_soon(self.ble_loop.stop)
+            self.ble_loop.run_forever()
+        except Exception as e:
+            print(f"Asyncio loop error: {e}")
+        self.root.after(10, self.poll_asyncio_loop)
+
+    def init_watch_connection(self, device_obj=None):
+        if device_obj is None:
+            device_obj = self.watch_id
+            
+        if not device_obj:
+            self.update_status("PLEASE LINK A DEVICE", self.colors["secondary"])
+            return
+
+        async def switch():
+            if self.current_task and not self.current_task.done():
+                self.current_task.cancel()
+                try:
+                    await self.current_task
+                except asyncio.CancelledError:
+                    pass
+                except Exception as e:
+                    print(f"Error waiting for cancelled task: {e}")
+
             self.core = GarminCore(
-                watch_id=self.watch_id,
+                watch_id=device_obj,
                 callback=lambda bpm: self.root.after(0, self.update_bpm, bpm),
                 status_callback=lambda msg, color: self.root.after(0, self.update_status_wrapper, msg, color)
             )
-            asyncio.run(self.core.start())
-        Thread(target=run_core, daemon=True).start()
+            self.current_task = asyncio.create_task(self.core.start())
+            
+        self.ble_loop.create_task(switch())
 
     def start_scan(self):
         self.scan_btn.config(state="disabled", text="SCANNING...")
         self.device_list.delete(*self.device_list.get_children())
         
         async def scan():
-            devices = await BleakScanner.discover(timeout=5.0)
-            for d in devices:
-                name = d.name if d.name else "Unknown Device"
-                self.device_list.insert("", "end", values=(d.address, name))
-            self.scan_btn.config(state="normal", text="SCAN FOR DEVICES")
+            try:
+                devices = await BleakScanner.discover(timeout=5.0)
+                self.scanned_devices = {d.address: d for d in devices}
+                for d in devices:
+                    name = d.name if d.name else "Unknown Device"
+                    self.device_list.insert("", "end", values=(d.address, name))
+                self.scan_btn.config(state="normal", text="SCAN FOR DEVICES")
+            except Exception as e:
+                print(f"Error during scan: {e}")
+                self.scan_btn.config(state="normal", text="SCAN FOR DEVICES")
 
-        def run_scan():
-            asyncio.run(scan())
-        
-        Thread(target=run_scan, daemon=True).start()
+        self.ble_loop.create_task(scan())
 
     def on_device_select(self, event):
         item = self.device_list.selection()[0]
         self.watch_id = self.device_list.item(item, "values")[0]
         self.save_config()
         self.update_status(f"LINKED: {self.watch_id}", self.colors["accent"])
-        self.init_watch_connection()
+        
+        # Get the cached BLEDevice object if available, otherwise fallback to the watch_id string
+        device_obj = self.scanned_devices.get(self.watch_id, self.watch_id)
+        self.init_watch_connection(device_obj)
+
+    def on_close(self):
+        # Stop background asyncio tasks and loop
+        if self.current_task and not self.current_task.done():
+            self.current_task.cancel()
+        self.ble_loop.stop()
+        self.root.destroy()
 
     def toggle_server(self):
         self.broadcasting = not self.broadcasting
